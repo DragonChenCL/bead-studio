@@ -25,6 +25,12 @@ type Point = { x: number; y: number };
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
+function distance(a: Point, b: Point) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+function midpoint(a: Point, b: Point) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
 
 export default function WorkspaceCanvas({
   pattern,
@@ -45,6 +51,8 @@ export default function WorkspaceCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Point>({ x: 26, y: 26 });
+  const zoomRef = useRef(1);
+  const panRef = useRef<Point>({ x: 26, y: 26 });
   const [hover, setHover] = useState<{ x: number; y: number; index: number; code: string | null } | null>(null);
   const pointerRef = useRef<{
     id: number;
@@ -52,7 +60,16 @@ export default function WorkspaceCanvas({
     lastClient: Point;
     lastIndex: number;
   } | null>(null);
+  const touchPointsRef = useRef(new Map<number, Point>());
+  const pinchRef = useRef<{
+    startDistance: number;
+    startZoom: number;
+    anchorWorld: Point;
+  } | null>(null);
   const spaceRef = useRef(false);
+
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { panRef.current = pan; }, [pan]);
 
   const cellSize = useMemo(() => {
     if (!pattern) return 16;
@@ -71,19 +88,26 @@ export default function WorkspaceCanvas({
     }
     const width = pattern.width * cellSize;
     const height = pattern.height * cellSize;
-    const availableW = Math.max(120, viewport.clientWidth - 52);
-    const availableH = Math.max(120, viewport.clientHeight - 52);
+    const mobilePad = viewport.clientWidth < 720 ? 22 : 52;
+    const availableW = Math.max(120, viewport.clientWidth - mobilePad);
+    const availableH = Math.max(120, viewport.clientHeight - mobilePad);
     const nextZoom = clamp(Math.min(1, availableW / width, availableH / height), 0.18, 1);
     setZoom(nextZoom);
     setPan({
-      x: Math.max(24, (viewport.clientWidth - width * nextZoom) / 2),
-      y: Math.max(24, (viewport.clientHeight - height * nextZoom) / 2),
+      x: Math.max(mobilePad / 2, (viewport.clientWidth - width * nextZoom) / 2),
+      y: Math.max(mobilePad / 2, (viewport.clientHeight - height * nextZoom) / 2),
     });
   }, [pattern, cellSize]);
 
   useEffect(() => {
     resetView();
   }, [pattern?.id, pattern?.width, pattern?.height, resetView]);
+
+  useEffect(() => {
+    const onResize = () => resetView();
+    window.addEventListener('orientationchange', onResize);
+    return () => window.removeEventListener('orientationchange', onResize);
+  }, [resetView]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -173,8 +197,8 @@ export default function WorkspaceCanvas({
   function toCell(clientX: number, clientY: number) {
     if (!pattern || !viewportRef.current) return null;
     const rect = viewportRef.current.getBoundingClientRect();
-    const localX = (clientX - rect.left - pan.x) / zoom;
-    const localY = (clientY - rect.top - pan.y) / zoom;
+    const localX = (clientX - rect.left - panRef.current.x) / zoomRef.current;
+    const localY = (clientY - rect.top - panRef.current.y) / zoomRef.current;
     const x = Math.floor(localX / cellSize);
     const y = Math.floor(localY / cellSize);
     if (x < 0 || y < 0 || x >= pattern.width || y >= pattern.height) return null;
@@ -198,8 +222,37 @@ export default function WorkspaceCanvas({
     onPaint?.(cell.index, code);
   }
 
+  function startPinch(viewport: HTMLDivElement) {
+    const points = [...touchPointsRef.current.values()];
+    if (points.length < 2) return;
+    const a = points[0];
+    const b = points[1];
+    const mid = midpoint(a, b);
+    const rect = viewport.getBoundingClientRect();
+    const localMid = { x: mid.x - rect.left, y: mid.y - rect.top };
+    pinchRef.current = {
+      startDistance: Math.max(1, distance(a, b)),
+      startZoom: zoomRef.current,
+      anchorWorld: {
+        x: (localMid.x - panRef.current.x) / zoomRef.current,
+        y: (localMid.y - panRef.current.y) / zoomRef.current,
+      },
+    };
+    pointerRef.current = null;
+  }
+
   function onPointerDown(ev: ReactPointerEvent<HTMLDivElement>) {
     if (!pattern) return;
+    if (ev.pointerType === 'touch') {
+      touchPointsRef.current.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      ev.currentTarget.setPointerCapture(ev.pointerId);
+      if (touchPointsRef.current.size >= 2) {
+        ev.preventDefault();
+        startPinch(ev.currentTarget);
+        return;
+      }
+    }
+
     const panAction = ev.button === 1 || spaceRef.current || (mode === 'paint' && tool === 'pan');
     if (panAction) {
       ev.preventDefault();
@@ -233,6 +286,29 @@ export default function WorkspaceCanvas({
   }
 
   function onPointerMove(ev: ReactPointerEvent<HTMLDivElement>) {
+    if (ev.pointerType === 'touch' && touchPointsRef.current.has(ev.pointerId)) {
+      touchPointsRef.current.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    }
+
+    if (pinchRef.current && touchPointsRef.current.size >= 2 && viewportRef.current) {
+      ev.preventDefault();
+      const points = [...touchPointsRef.current.values()];
+      const a = points[0];
+      const b = points[1];
+      const mid = midpoint(a, b);
+      const rect = viewportRef.current.getBoundingClientRect();
+      const localMid = { x: mid.x - rect.left, y: mid.y - rect.top };
+      const ratio = distance(a, b) / pinchRef.current.startDistance;
+      const nextZoom = clamp(pinchRef.current.startZoom * ratio, 0.18, 5);
+      const nextPan = {
+        x: localMid.x - pinchRef.current.anchorWorld.x * nextZoom,
+        y: localMid.y - pinchRef.current.anchorWorld.y * nextZoom,
+      };
+      setZoom(nextZoom);
+      setPan(nextPan);
+      return;
+    }
+
     setHover(toCell(ev.clientX, ev.clientY));
     const current = pointerRef.current;
     if (!current || current.id !== ev.pointerId) return;
@@ -247,6 +323,10 @@ export default function WorkspaceCanvas({
   }
 
   function onPointerUp(ev: ReactPointerEvent<HTMLDivElement>) {
+    if (ev.pointerType === 'touch') {
+      touchPointsRef.current.delete(ev.pointerId);
+      if (touchPointsRef.current.size < 2) pinchRef.current = null;
+    }
     if (pointerRef.current?.id === ev.pointerId) pointerRef.current = null;
   }
 
@@ -256,10 +336,10 @@ export default function WorkspaceCanvas({
     const rect = viewportRef.current.getBoundingClientRect();
     const cursorX = ev.clientX - rect.left;
     const cursorY = ev.clientY - rect.top;
-    const worldX = (cursorX - pan.x) / zoom;
-    const worldY = (cursorY - pan.y) / zoom;
+    const worldX = (cursorX - panRef.current.x) / zoomRef.current;
+    const worldY = (cursorY - panRef.current.y) / zoomRef.current;
     const factor = ev.deltaY < 0 ? 1.12 : 0.89;
-    const nextZoom = clamp(zoom * factor, 0.18, 5);
+    const nextZoom = clamp(zoomRef.current * factor, 0.18, 5);
     setZoom(nextZoom);
     setPan({ x: cursorX - worldX * nextZoom, y: cursorY - worldY * nextZoom });
   }
@@ -313,7 +393,7 @@ export default function WorkspaceCanvas({
       </div>
       <div className="workspace-statusbar">
         <span>{pattern ? `${pattern.width} × ${pattern.height}` : '空工作区'}</span>
-        <span>{hover ? `第 ${hover.y + 1} 行 / 第 ${hover.x + 1} 列 · ${hover.code || '空'}` : '移动鼠标查看坐标'}</span>
+        <span>{hover ? `第 ${hover.y + 1} 行 / 第 ${hover.x + 1} 列 · ${hover.code || '空'}` : '单指按当前工具操作 · 双指缩放/移动'}</span>
         <div className="workspace-zoom">
           <button type="button" onClick={() => setZoom((z) => clamp(z / 1.2, 0.18, 5))}>−</button>
           <b>{Math.round(zoom * 100)}%</b>
