@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import WorkspaceCanvas, { type WorkspaceTool } from './components/WorkspaceCanvas';
-import PalettePicker from './components/PalettePicker';
 import InventoryPanel from './components/InventoryPanel';
-import OptimizationPanel from './components/OptimizationPanel';
 import InspectionPanel from './components/InspectionPanel';
 import ProjectLibraryPanel from './components/ProjectLibraryPanel';
 import BuildPanel from './components/BuildPanel';
+import WelcomePanel from './components/WelcomePanel';
+import ToolDock from './components/ToolDock';
 import { buildPatternFromImageElement, summarizeUsage } from './core/engine';
 import { downloadJson } from './core/download';
 import { deductPatternFromInventory, restorePatternToInventory } from './core/inventory';
@@ -199,7 +199,7 @@ export default function App() {
   function exportProject() {
     if (!pattern) return notify('没有可导出的作品', 'bad');
     downloadJson(
-      { version: 'bead-studio/0.4', pattern, inventory, completed },
+      { version: 'bead-studio/0.5', pattern, inventory, completed },
       `${pattern.name || 'bead-project'}.json`,
     );
   }
@@ -319,14 +319,14 @@ export default function App() {
         <div className="brand">
           <div className="logo"><span /></div>
           <div>
-            <h1>拼豆工作台 <em>V0.4</em></h1>
-            <p>设计 · 库存改图 · 施工进度 · 实物检查 · 熨烫</p>
+            <h1>拼豆工作台 <em>V0.5</em></h1>
+            <p>从一张图开始，陪你真正把作品拼完</p>
           </div>
         </div>
         <div className="toolbar">
-          <button onClick={newProject}>新建</button>
-          <label className="filebtn">导入工程<input ref={importRef} type="file" accept="application/json" onChange={importProject} /></label>
-          <button onClick={exportProject}>导出工程</button>
+          <button onClick={newProject} data-help="回到欢迎页，开始制作一个新的拼豆作品；当前作品会自动保存在作品库">新建作品</button>
+          <label className="filebtn" data-help="导入之前从本工具导出的 JSON 工程文件，恢复图纸、豆库和施工进度">导入工程<input ref={importRef} type="file" accept="application/json" onChange={importProject} /></label>
+          <button onClick={exportProject} data-help="把当前图纸、豆库和施工进度保存为 JSON 文件，便于备份或换设备">导出工程</button>
         </div>
       </header>
 
@@ -348,16 +348,20 @@ export default function App() {
         </div>
       )}
 
-      {tab === 'work' && (
-        <main className="work-grid">
+      {tab === 'work' && !pattern && (
+        <WelcomePanel gridWidth={gridWidth} setGridWidth={setGridWidth} onUpload={imageUpload} records={records} onOpen={openRecord} />
+      )}
+
+      {tab === 'work' && pattern && (
+        <main className="work-grid work-grid-v5">
           <section className="card main-card">
             <div className="card-hd workspace-header">
               <div className="project-heading">
-                {pattern ? <input className="project-name" value={pattern.name} onChange={(e) => rename(e.target.value)} /> : <h2>创建一个作品开始</h2>}
-                <p>{pattern ? `${pattern.width}×${pattern.height} · ${total.toLocaleString()} 颗 · ${usage.length} 色` : '图片全部在浏览器本地处理'}</p>
+                <input className="project-name" value={pattern.name} onChange={(e) => rename(e.target.value)} />
+                <p>{pattern.width}×{pattern.height} · {total.toLocaleString()} 颗 · {usage.length} 色</p>
               </div>
               <div className="toolbar">
-                <label className="filebtn primary">上传图片<input type="file" accept="image/*" onChange={imageUpload} /></label>
+                <label className="filebtn primary" data-help="重新选择一张图片生成图纸；当前作品会保存在作品库中">换一张图片<input type="file" accept="image/*" onChange={imageUpload} /></label>
                 <label className="inline-field">宽度 <input type="number" min="8" max="160" value={gridWidth} onChange={(e) => setGridWidth(e.target.value)} /></label>
               </div>
             </div>
@@ -387,16 +391,16 @@ export default function App() {
               locked={settled}
             />
           </section>
-          <aside className="side-stack">
-            <PalettePicker selected={selectedCode} onSelect={(code: string) => { setSelectedCode(code); setTool('brush'); }} />
-            <OptimizationPanel pattern={pattern} inventory={inventory} onApply={applyOptimized} onToast={notify} />
-            <div className="card">
-              <div className="card-hd"><h2>用量 Top 12</h2></div>
-              <div className="card-bd usage-list">
-                {usage.slice(0, 12).map((row) => <div key={row.code}><span><i className="swatch" style={{ background: row.color?.hex }} />{row.code}</span><b>{row.count}</b></div>)}
-                {!usage.length && <span className="muted">暂无用量</span>}
-              </div>
-            </div>
+          <aside className="side-stack side-stack-v5">
+            <ToolDock
+              selectedCode={selectedCode}
+              onSelect={(code: string) => { setSelectedCode(code); setTool('brush'); }}
+              pattern={pattern}
+              inventory={inventory}
+              onApply={applyOptimized}
+              onToast={notify}
+              usage={usage}
+            />
           </aside>
         </main>
       )}
