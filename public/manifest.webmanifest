@@ -1,0 +1,10 @@
+{
+  "name": "拼豆工作台",
+  "short_name": "拼豆",
+  "description": "个人拼豆工作台：图纸、豆库、库存约束改图、施工、拍照验豆和熨烫检测。",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3f0e9",
+  "theme_color": "#2f6d58",
+  "lang": "zh-CN"
+}
