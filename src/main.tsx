@@ -5,6 +5,7 @@ import ButtonHints from './components/ButtonHints';
 import './styles.css';
 import './theme.css';
 import './palette-theme.css';
+import './experience.css';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
