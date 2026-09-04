@@ -6,7 +6,8 @@ import ProjectLibraryPanel from './components/ProjectLibraryPanel';
 import BuildPanel from './components/BuildPanel';
 import WelcomePanel from './components/WelcomePanel';
 import ToolDock from './components/ToolDock';
-import { buildPatternFromImageElement, summarizeUsage } from './core/engine';
+import H5BottomNav from './components/H5BottomNav';
+import { buildPatternFromImageElement, paletteByCode, summarizeUsage } from './core/engine';
 import { downloadJson } from './core/download';
 import { deductPatternFromInventory, restorePatternToInventory } from './core/inventory';
 import type { Inventory, Pattern, ProjectRecord } from './core/types';
@@ -40,10 +41,23 @@ function snapshotPattern(pattern: Pattern): Pattern {
   return { ...pattern, cells: pattern.cells.slice() };
 }
 
+function useH5Layout() {
+  const [isH5, setIsH5] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 760px)');
+    const sync = () => setIsH5(media.matches);
+    sync();
+    media.addEventListener?.('change', sync);
+    return () => media.removeEventListener?.('change', sync);
+  }, []);
+  return isH5;
+}
+
 type Toast = { text: string; kind?: string } | null;
 
 export default function App() {
   const initialProject = useMemo(() => loadProject(), []);
+  const isH5 = useH5Layout();
   const [tab, setTab] = useState('work');
   const [pattern, setPattern] = useState<Pattern | null>(initialProject);
   const [completed, setCompleted] = useState<number[]>(() => loadProgressFor(initialProject));
@@ -52,9 +66,11 @@ export default function App() {
   const [selectedCode, setSelectedCode] = useState('H7');
   const [focusCode, setFocusCode] = useState('');
   const [gridWidth, setGridWidth] = useState<number | string>(52);
-  const [tool, setTool] = useState<WorkspaceTool>('brush');
+  const [tool, setTool] = useState<WorkspaceTool>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches ? 'pan' : 'brush');
   const [showGrid, setShowGrid] = useState(true);
   const [toast, setToast] = useState<Toast>(null);
+  const [mobileDockOpen, setMobileDockOpen] = useState(false);
+  const [dockTab, setDockTab] = useState('palette');
   const importRef = useRef<HTMLInputElement | null>(null);
   const undoStack = useRef<Pattern[]>([]);
   const redoStack = useRef<Pattern[]>([]);
@@ -77,6 +93,10 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [inventory]);
 
+  useEffect(() => {
+    setMobileDockOpen(false);
+  }, [tab]);
+
   function notify(text: string, kind = '') {
     setToast({ text, kind });
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -95,6 +115,7 @@ export default function App() {
   }, [completed, pattern]);
   const progress = total ? Math.round((doneCount * 100) / total) : 0;
   const settled = Boolean(pattern?.inventoryDeductedAt);
+  const selectedHex = paletteByCode.get(selectedCode)?.hex || '#ddd';
 
   function resetHistory() {
     undoStack.current = [];
@@ -162,7 +183,7 @@ export default function App() {
       setPattern(next);
       setCompleted([]);
       setFocusCode('');
-      setTool('brush');
+      setTool(isH5 ? 'pan' : 'brush');
       resetHistory();
       setTab('work');
       notify(`已生成 ${next.width}×${next.height} 图纸`, 'ok');
@@ -199,7 +220,7 @@ export default function App() {
   function exportProject() {
     if (!pattern) return notify('没有可导出的作品', 'bad');
     downloadJson(
-      { version: 'bead-studio/0.5', pattern, inventory, completed },
+      { version: 'bead-studio/0.6-h5', pattern, inventory, completed },
       `${pattern.name || 'bead-project'}.json`,
     );
   }
@@ -215,6 +236,7 @@ export default function App() {
       setInventory(data.inventory || inventory);
       setCompleted(Array.isArray(data.completed) ? data.completed : []);
       resetHistory();
+      setTool(isH5 ? 'pan' : 'brush');
       setTab('work');
       notify('工程已导入', 'ok');
     } catch {
@@ -229,6 +251,7 @@ export default function App() {
     setPattern(null);
     setCompleted([]);
     setFocusCode('');
+    setMobileDockOpen(false);
     resetHistory();
     setTab('work');
     notify('已进入新作品工作区');
@@ -238,6 +261,7 @@ export default function App() {
     setPattern(normalizePattern(record.pattern));
     setCompleted(record.completed || []);
     setFocusCode('');
+    setTool(isH5 ? 'pan' : 'brush');
     resetHistory();
     setTab('work');
     notify(`已打开「${record.pattern.name}」`, 'ok');
@@ -260,6 +284,7 @@ export default function App() {
     refreshLibrary();
     setPattern(copy.pattern);
     setCompleted([]);
+    setTool(isH5 ? 'pan' : 'brush');
     resetHistory();
     setTab('work');
   }
@@ -277,6 +302,7 @@ export default function App() {
       inventoryDeductedAt: undefined,
     });
     setCompleted([]);
+    setMobileDockOpen(false);
     notify('优化结果已应用，施工进度已重置', 'ok');
   }
 
@@ -304,6 +330,11 @@ export default function App() {
     notify('库存已恢复，图纸重新解锁', 'ok');
   }
 
+  function openDock(nextTab = 'palette') {
+    setDockTab(nextTab);
+    setMobileDockOpen(true);
+  }
+
   const nav = [
     ['work', '设计'],
     ['build', '施工'],
@@ -314,23 +345,23 @@ export default function App() {
   ];
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${mobileDockOpen ? 'h5-dock-open' : ''}`}>
       <header className="topbar">
         <div className="brand">
           <div className="logo"><span /></div>
           <div>
-            <h1>拼豆工作台 <em>V0.5</em></h1>
+            <h1>拼豆工作台 <em>V0.6</em></h1>
             <p>从一张图开始，陪你真正把作品拼完</p>
           </div>
         </div>
-        <div className="toolbar">
+        <div className="toolbar desktop-actions">
           <button onClick={newProject} data-help="回到欢迎页，开始制作一个新的拼豆作品；当前作品会自动保存在作品库">新建作品</button>
           <label className="filebtn" data-help="导入之前从本工具导出的 JSON 工程文件，恢复图纸、豆库和施工进度">导入工程<input ref={importRef} type="file" accept="application/json" onChange={importProject} /></label>
           <button onClick={exportProject} data-help="把当前图纸、豆库和施工进度保存为 JSON 文件，便于备份或换设备">导出工程</button>
         </div>
       </header>
 
-      <nav className="tabs">
+      <nav className="tabs desktop-tabs">
         {nav.map(([key, name]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{name}</button>)}
       </nav>
 
@@ -353,26 +384,26 @@ export default function App() {
       )}
 
       {tab === 'work' && pattern && (
-        <main className="work-grid work-grid-v5">
-          <section className="card main-card">
+        <main className="work-grid work-grid-v5 h5-work-page">
+          <section className="card main-card h5-canvas-card">
             <div className="card-hd workspace-header">
               <div className="project-heading">
                 <input className="project-name" value={pattern.name} onChange={(e) => rename(e.target.value)} />
                 <p>{pattern.width}×{pattern.height} · {total.toLocaleString()} 颗 · {usage.length} 色</p>
               </div>
-              <div className="toolbar">
-                <label className="filebtn primary" data-help="重新选择一张图片生成图纸；当前作品会保存在作品库中">换一张图片<input type="file" accept="image/*" onChange={imageUpload} /></label>
+              <div className="toolbar h5-project-actions">
+                <label className="filebtn primary" data-help="重新选择一张图片生成图纸；当前作品会保存在作品库中">换图<input type="file" accept="image/*" onChange={imageUpload} /></label>
                 <label className="inline-field">宽度 <input type="number" min="8" max="160" value={gridWidth} onChange={(e) => setGridWidth(e.target.value)} /></label>
               </div>
             </div>
             <div className="workspace-toolbar">
-              <div className="tool-group">
+              <div className="tool-group desktop-edit-tools">
                 <button className={tool === 'brush' ? 'active' : ''} onClick={() => setTool('brush')}>画笔 <kbd>B</kbd></button>
                 <button className={tool === 'eraser' ? 'active' : ''} onClick={() => setTool('eraser')}>橡皮 <kbd>E</kbd></button>
                 <button className={tool === 'picker' ? 'active' : ''} onClick={() => setTool('picker')}>吸管 <kbd>I</kbd></button>
                 <button className={tool === 'pan' ? 'active' : ''} onClick={() => setTool('pan')}>拖动画布 <kbd>H</kbd></button>
               </div>
-              <div className="tool-group">
+              <div className="tool-group h5-history-tools">
                 <button disabled={!undoStack.current.length || settled} onClick={undo}>撤销</button>
                 <button disabled={!redoStack.current.length || settled} onClick={redo}>重做</button>
                 <button className={showGrid ? 'active' : ''} onClick={() => setShowGrid((v) => !v)}>网格</button>
@@ -391,25 +422,39 @@ export default function App() {
               locked={settled}
             />
           </section>
-          <aside className="side-stack side-stack-v5">
+
+          <button className={`h5-tool-backdrop ${mobileDockOpen ? 'show' : ''}`} onClick={() => setMobileDockOpen(false)} aria-label="关闭工具抽屉" />
+          <aside className={`side-stack side-stack-v5 h5-tool-sheet ${mobileDockOpen ? 'h5-open' : ''}`}>
+            <div className="h5-tool-sheet-top"><span></span><button onClick={() => setMobileDockOpen(false)}>完成</button></div>
             <ToolDock
               selectedCode={selectedCode}
-              onSelect={(code: string) => { setSelectedCode(code); setTool('brush'); }}
+              onSelect={(code: string) => { setSelectedCode(code); setTool('brush'); if (isH5) setMobileDockOpen(false); }}
               pattern={pattern}
               inventory={inventory}
               onApply={applyOptimized}
               onToast={notify}
               usage={usage}
+              activeTab={dockTab}
+              onTabChange={setDockTab}
             />
           </aside>
+
+          <div className="h5-editor-bar" aria-label="手机端图纸工具">
+            <button className={tool === 'pan' ? 'active' : ''} onClick={() => { setTool('pan'); setMobileDockOpen(false); }}><span>✥</span><b>移动</b></button>
+            <button className={tool === 'brush' ? 'active' : ''} onClick={() => { setTool('brush'); setMobileDockOpen(false); }}><span>✎</span><b>画笔</b></button>
+            <button className={tool === 'eraser' ? 'active' : ''} onClick={() => { setTool('eraser'); setMobileDockOpen(false); }}><span>◇</span><b>橡皮</b></button>
+            <button className={tool === 'picker' ? 'active' : ''} onClick={() => { setTool('picker'); setMobileDockOpen(false); }}><span>⊙</span><b>吸管</b></button>
+            <button className={mobileDockOpen && dockTab === 'palette' ? 'active' : ''} onClick={() => openDock('palette')}><i className="h5-color-dot" style={{ background: selectedHex }} /><b>{selectedCode}</b></button>
+            <button className={mobileDockOpen && dockTab === 'opt' ? 'active' : ''} onClick={() => openDock('opt')}><span>⇄</span><b>改图</b></button>
+          </div>
         </main>
       )}
 
       {tab === 'build' && (
-        <main className="work-grid build-layout">
+        <main className="work-grid build-layout h5-build-page">
           <section className="card main-card">
             <div className="card-hd">
-              <div><h2>{pattern?.name || '施工模式'}</h2><p>点击豆子标记已完成；已完成区域会显示深色勾</p></div>
+              <div><h2>{pattern?.name || '施工模式'}</h2><p>点豆子标记完成；双指可以缩放和移动图纸</p></div>
               <div className="toolbar"><button onClick={() => setFocusCode('')}>显示全部颜色</button></div>
             </div>
             <WorkspaceCanvas
@@ -424,7 +469,7 @@ export default function App() {
               locked={settled}
             />
           </section>
-          <aside className="side-stack">
+          <aside className="side-stack h5-build-tools">
             <BuildPanel
               pattern={pattern}
               completed={completed}
@@ -435,18 +480,27 @@ export default function App() {
               onSettleInventory={settleInventory}
               onRestoreInventory={restoreInventory}
             />
-            <div className="card"><div className="card-bd"><div className="callout"><b>推荐流程：</b>按一个色号集中铺豆 → 点“本色完成” → 换下一个颜色。中途随时可以去“拍照验豆”检查。</div></div></div>
+            <div className="card desktop-build-hint"><div className="card-bd"><div className="callout"><b>推荐流程：</b>按一个色号集中铺豆 → 点“本色完成” → 换下一个颜色。中途随时可以去“拍照验豆”检查。</div></div></div>
           </aside>
         </main>
       )}
 
-      {tab === 'inventory' && <main className="single"><InventoryPanel pattern={pattern} inventory={inventory} onChange={setInventory} onToast={notify} /></main>}
-      {tab === 'photo' && <main className="single"><InspectionPanel pattern={pattern} mode="photo" onToast={notify} onMarkCompleted={(indexes: number[]) => setCompleted((prev) => [...new Set([...prev, ...indexes])])} /></main>}
-      {tab === 'iron' && <main className="single"><InspectionPanel pattern={pattern} mode="iron" onToast={notify} onMarkCompleted={undefined} /></main>}
-      {tab === 'library' && <main className="single"><ProjectLibraryPanel records={records} currentId={pattern?.id} onOpen={openRecord} onDelete={deleteRecord} onDuplicate={duplicateRecord} onToast={notify} /></main>}
+      {tab === 'inventory' && <main className="single h5-page"><InventoryPanel pattern={pattern} inventory={inventory} onChange={setInventory} onToast={notify} /></main>}
+      {tab === 'photo' && <main className="single h5-page"><InspectionPanel pattern={pattern} mode="photo" onToast={notify} onMarkCompleted={(indexes: number[]) => setCompleted((prev) => [...new Set([...prev, ...indexes])])} /></main>}
+      {tab === 'iron' && <main className="single h5-page"><InspectionPanel pattern={pattern} mode="iron" onToast={notify} onMarkCompleted={undefined} /></main>}
+      {tab === 'library' && <main className="single h5-page"><ProjectLibraryPanel records={records} currentId={pattern?.id} onOpen={openRecord} onDelete={deleteRecord} onDuplicate={duplicateRecord} onToast={notify} /></main>}
 
       <footer>所有图片、库存、施工进度都在浏览器本地处理。MARD 色卡及上游声明见 THIRD_PARTY_NOTICES.md。</footer>
       {toast && <div className={`toast show ${toast.kind || ''}`}>{toast.text}</div>}
+
+      <H5BottomNav
+        tab={tab}
+        hasPattern={Boolean(pattern)}
+        onTab={(next) => { setMobileDockOpen(false); setTab(next); }}
+        onNew={newProject}
+        onImport={() => importRef.current?.click()}
+        onExport={exportProject}
+      />
     </div>
   );
 }
