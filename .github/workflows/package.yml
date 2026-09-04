@@ -1,0 +1,47 @@
+name: Package Bead Studio
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run core tests
+        run: npm run test:core
+
+      - name: Build
+        run: npm run build
+
+      - name: Create zip package
+        shell: bash
+        run: |
+          cd dist
+          zip -r ../bead-studio-${GITHUB_SHA::7}.zip .
+          cd ..
+          ls -lh bead-studio-*.zip
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bead-studio-${{ github.sha }}
+          path: bead-studio-*.zip
+          if-no-files-found: error
+          retention-days: 30
