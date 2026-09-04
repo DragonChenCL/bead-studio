@@ -1,5 +1,17 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
-if('serviceWorker' in navigator && import.meta.env.PROD){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+import ButtonHints from './components/ButtonHints';
+import './styles.css';
+import './theme.css';
+
+createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+    <ButtonHints />
+  </React.StrictMode>,
+);
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
