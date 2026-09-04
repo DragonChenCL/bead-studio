@@ -3,12 +3,14 @@ import { useState } from 'react';
 import PalettePicker from './PalettePicker';
 import OptimizationPanel from './OptimizationPanel';
 
-export default function ToolDock({selectedCode,onSelect,pattern,inventory,onApply,onToast,usage}){
-  const [tab,setTab]=useState('palette');
+export default function ToolDock({selectedCode,onSelect,pattern,inventory,onApply,onToast,usage,activeTab,onTabChange}){
+  const [internalTab,setInternalTab]=useState('palette');
+  const tab=activeTab||internalTab;
+  const setTab=(next)=>{if(onTabChange)onTabChange(next);else setInternalTab(next)};
   const tabs=[['palette','选色','选择画笔要使用的拼豆颜色'],['opt','改图','按现有库存重新分配颜色，减少补豆'],['usage','用量','查看当前图纸最常使用的色号和数量']];
   return <div className="tool-dock card">
     <div className="tool-dock-head">
-      <div><span>WORKBENCH</span><h2>右侧工具台</h2></div>
+      <div><span>WORKBENCH</span><h2>工具台</h2></div>
       <b>{pattern?`${pattern.width}×${pattern.height}`:'未创建'}</b>
     </div>
     <div className="tool-dock-tabs">{tabs.map(([key,name,help])=><button key={key} className={tab===key?'active':''} onClick={()=>setTab(key)} data-help={help}>{name}</button>)}</div>
