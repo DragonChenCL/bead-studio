@@ -7,6 +7,7 @@ import './theme.css';
 import './palette-theme.css';
 import './experience.css';
 import './h5.css';
+import './brand.css';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

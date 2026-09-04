@@ -1,0 +1,24 @@
+/* Brand identity layer: full wordmark in the header, icon mark for compact surfaces. */
+.brand .logo{
+  width:252px!important;
+  height:62px!important;
+  flex:0 0 252px!important;
+  border-radius:0!important;
+  background:transparent url('./assets/brand-logo.svg') center/contain no-repeat!important;
+  box-shadow:none!important;
+  border:0!important;
+  overflow:visible!important;
+}
+.brand .logo::before,.brand .logo::after,.brand .logo span{display:none!important}
+.brand>div:not(.logo){display:none!important}
+.topbar .brand{min-width:252px;align-items:center!important}
+
+@media(max-width:760px){
+  .brand .logo{width:164px!important;height:44px!important;flex-basis:164px!important}
+  .topbar .brand{min-width:164px!important}
+}
+
+@media(max-width:390px){
+  .brand .logo{width:148px!important;height:42px!important;flex-basis:148px!important}
+  .topbar .brand{min-width:148px!important}
+}
