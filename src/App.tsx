@@ -7,6 +7,7 @@ import BuildPanel from './components/BuildPanel';
 import WelcomePanel from './components/WelcomePanel';
 import ToolDock from './components/ToolDock';
 import H5BottomNav from './components/H5BottomNav';
+import Bead3DPreview from './components/Bead3DPreview';
 import { buildPatternFromImageElement, paletteByCode, summarizeUsage } from './core/engine';
 import { downloadJson } from './core/download';
 import { deductPatternFromInventory, restorePatternToInventory } from './core/inventory';
@@ -220,7 +221,7 @@ export default function App() {
   function exportProject() {
     if (!pattern) return notify('没有可导出的作品', 'bad');
     downloadJson(
-      { version: 'bead-studio/0.6-h5', pattern, inventory, completed },
+      { version: 'bead-studio/0.7-3d', pattern, inventory, completed },
       `${pattern.name || 'bead-project'}.json`,
     );
   }
@@ -337,39 +338,41 @@ export default function App() {
 
   const nav = [
     ['work', '设计'],
+    ['preview', '3D成品'],
     ['build', '施工'],
     ['inventory', '豆库'],
-    ['photo', '拍照验豆'],
-    ['iron', '熨烫检测'],
+    ['photo', '验豆'],
+    ['iron', '熨烫'],
     ['library', '作品库'],
   ];
 
   return (
-    <div className={`app-shell ${mobileDockOpen ? 'h5-dock-open' : ''}`}>
-      <header className="topbar">
-        <div className="brand">
+    <div className={`app-shell studio-shell ${mobileDockOpen ? 'h5-dock-open' : ''}`}>
+      <header className="topbar studio-topbar">
+        <button className="brand studio-brand" onClick={() => setTab('work')} aria-label="回到设计页">
           <div className="logo"><span /></div>
           <div>
-            <h1>拼豆工作台 <em>V0.6</em></h1>
-            <p>从一张图开始，陪你真正把作品拼完</p>
+            <h1>拼豆工作台 <em>V0.7</em></h1>
+            <p>设计 · 备豆 · 施工 · 验收 · 3D 成品</p>
           </div>
-        </div>
-        <div className="toolbar desktop-actions">
-          <button onClick={newProject} data-help="回到欢迎页，开始制作一个新的拼豆作品；当前作品会自动保存在作品库">新建作品</button>
-          <label className="filebtn" data-help="导入之前从本工具导出的 JSON 工程文件，恢复图纸、豆库和施工进度">导入工程<input ref={importRef} type="file" accept="application/json" onChange={importProject} /></label>
-          <button onClick={exportProject} data-help="把当前图纸、豆库和施工进度保存为 JSON 文件，便于备份或换设备">导出工程</button>
+        </button>
+        <div className="toolbar desktop-actions studio-header-actions">
+          {pattern && <button className="preview-cta" onClick={() => setTab('preview')}>◈ 3D 看成品</button>}
+          <button onClick={newProject}>新建</button>
+          <label className="filebtn">导入<input ref={importRef} type="file" accept="application/json" onChange={importProject} /></label>
+          <button onClick={exportProject}>导出</button>
         </div>
       </header>
 
-      <nav className="tabs desktop-tabs">
-        {nav.map(([key, name]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{name}</button>)}
+      <nav className="tabs desktop-tabs studio-tabs">
+        {nav.map(([key, name]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{name}{key === 'preview' && <i>NEW</i>}</button>)}
       </nav>
 
       {pattern && (
-        <div className="project-strip">
-          <div>
-            <strong>{pattern.name}</strong>
-            <span>{pattern.width}×{pattern.height} · {total.toLocaleString()}颗 · {usage.length}色</span>
+        <div className="project-strip studio-project-strip">
+          <div className="studio-project-main">
+            <span className="studio-project-dot" style={{ background: selectedHex }} />
+            <div><strong>{pattern.name}</strong><span>{pattern.width}×{pattern.height} · {total.toLocaleString()}颗 · {usage.length}色</span></div>
             {settled && <span className="settled-tag">已扣库存</span>}
           </div>
           <div className="project-strip-progress">
@@ -384,15 +387,16 @@ export default function App() {
       )}
 
       {tab === 'work' && pattern && (
-        <main className="work-grid work-grid-v5 h5-work-page">
-          <section className="card main-card h5-canvas-card">
-            <div className="card-hd workspace-header">
+        <main className="work-grid work-grid-v5 h5-work-page studio-work-grid">
+          <section className="card main-card h5-canvas-card studio-main-card">
+            <div className="card-hd workspace-header studio-workspace-header">
               <div className="project-heading">
                 <input className="project-name" value={pattern.name} onChange={(e) => rename(e.target.value)} />
                 <p>{pattern.width}×{pattern.height} · {total.toLocaleString()} 颗 · {usage.length} 色</p>
               </div>
               <div className="toolbar h5-project-actions">
-                <label className="filebtn primary" data-help="重新选择一张图片生成图纸；当前作品会保存在作品库中">换图<input type="file" accept="image/*" onChange={imageUpload} /></label>
+                <button className="preview-inline-btn" onClick={() => setTab('preview')}>◈ 3D</button>
+                <label className="filebtn primary">换图<input type="file" accept="image/*" onChange={imageUpload} /></label>
                 <label className="inline-field">宽度 <input type="number" min="8" max="160" value={gridWidth} onChange={(e) => setGridWidth(e.target.value)} /></label>
               </div>
             </div>
@@ -450,12 +454,14 @@ export default function App() {
         </main>
       )}
 
+      {tab === 'preview' && <main className="single h5-page studio-preview-page"><Bead3DPreview pattern={pattern} completed={completed} onBack={() => setTab('work')} /></main>}
+
       {tab === 'build' && (
-        <main className="work-grid build-layout h5-build-page">
+        <main className="work-grid build-layout h5-build-page studio-build-page">
           <section className="card main-card">
             <div className="card-hd">
               <div><h2>{pattern?.name || '施工模式'}</h2><p>点豆子标记完成；双指可以缩放和移动图纸</p></div>
-              <div className="toolbar"><button onClick={() => setFocusCode('')}>显示全部颜色</button></div>
+              <div className="toolbar"><button onClick={() => setFocusCode('')}>显示全部颜色</button>{pattern && <button onClick={() => setTab('preview')}>3D 看进度</button>}</div>
             </div>
             <WorkspaceCanvas
               pattern={pattern}
@@ -490,7 +496,7 @@ export default function App() {
       {tab === 'iron' && <main className="single h5-page"><InspectionPanel pattern={pattern} mode="iron" onToast={notify} onMarkCompleted={undefined} /></main>}
       {tab === 'library' && <main className="single h5-page"><ProjectLibraryPanel records={records} currentId={pattern?.id} onOpen={openRecord} onDelete={deleteRecord} onDuplicate={duplicateRecord} onToast={notify} /></main>}
 
-      <footer>所有图片、库存、施工进度都在浏览器本地处理。MARD 色卡及上游声明见 THIRD_PARTY_NOTICES.md。</footer>
+      <footer>图片、库存、施工进度默认只在当前浏览器处理。MARD 色卡及上游声明见 THIRD_PARTY_NOTICES.md。</footer>
       {toast && <div className={`toast show ${toast.kind || ''}`}>{toast.text}</div>}
 
       <H5BottomNav
