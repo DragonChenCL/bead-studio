@@ -27,6 +27,14 @@ jobs:
           test -d .asset-upload
           cat .asset-upload/chunk-* | base64 --decode > /tmp/bead-assets.zip
           unzip -o /tmp/bead-assets.zip -d .
+
+          mkdir -p src/assets promotion/logo public
+          cp public/brand-logo.png src/assets/brand-logo.png
+          cp public/app-icon.png src/assets/brand-icon.png
+          cp public/brand-logo.png promotion/logo/brand-logo.png
+          cp public/app-icon.png promotion/logo/brand-icon.png
+          cp public/app-icon.png public/favicon.png
+
           test -f promotion/01-xiaohongshu-cover.png
           test -f promotion/02-overview.png
           test -f promotion/03-inventory-optimizer.png
