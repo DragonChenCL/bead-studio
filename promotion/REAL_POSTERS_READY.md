@@ -1,0 +1,1 @@
+The new promotion posters are generated from the actual current product UI and are pending binary asset commit in this session.
