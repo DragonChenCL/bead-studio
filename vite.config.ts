@@ -62,6 +62,29 @@ function xhsMiniToolPlugin(): Plugin {
         return next;
       }
 
+
+      if (cleanId.endsWith('/src/components/InventoryPanel.tsx')) {
+        let next = code;
+        next = replaceOrFail(next, "import { downloadCsv } from '../core/download';\n", '', 'remove CSV download helper import');
+        next = replaceOrFail(
+          next,
+          /\n  function exportPlan\(\)\{[\s\S]*?\}\n  return /,
+          '\n  return ',
+          'remove unsupported CSV export flow',
+        );
+        next = replaceOrFail(
+          next,
+          /<button onClick=\{exportPlan\}>导出 CSV<\/button>/,
+          '<span className="xhs-save-hint">采购计划仅本机使用</span>',
+          'replace CSV download control',
+        );
+        return next;
+      }
+
+      if (cleanId.endsWith('/src/styles.css')) {
+        return code.replace(/displax:/g, 'display:');
+      }
+
       if (cleanId.endsWith('/src/components/Bead3DPreview.tsx')) {
         let next = code;
         next = replaceOrFail(

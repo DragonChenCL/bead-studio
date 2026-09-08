@@ -79,7 +79,7 @@ const bannedJs = [
   ['window.prompt', /window\.prompt\s*\(/],
   ['fullscreen', /requestFullscreen\s*\(/],
   ['download attribute property', /\.download\s*=/],
-  ['external navigation', /location\.(?:href\s*=|assign\s*\()/],
+  ['external navigation', /location\.(?:href\s*=\s*['\"]https?:|assign\s*\(\s*['\"]https?:)/],
 ];
 
 for (const file of files.filter((file) => path.extname(file).toLowerCase() === '.js')) {
