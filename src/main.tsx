@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import ButtonHints from './components/ButtonHints';
+import ShareLauncher from './components/ShareLauncher';
 import './styles.css';
 import './theme.css';
 import './palette-theme.css';
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
     <ButtonHints />
+    <ShareLauncher />
   </React.StrictMode>,
 );
 
