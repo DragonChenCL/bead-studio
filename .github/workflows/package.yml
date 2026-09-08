@@ -26,30 +26,87 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install Xiaohongshu mini-tool skill 1.6.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          SKILL_URL='https://fe-static.xhscdn.com/mini-tool/20260831163932/minitool-zip-builder-1.6.0.skill'
+          SKILL_SHA256='29c04115fd89d7eab7b81775f4287ae20c569ad3794d25d8404dc0ec3ec3b65e'
+          curl --fail --location --retry 3 --output /tmp/minitool-zip-builder-1.6.0.skill "$SKILL_URL"
+          echo "${SKILL_SHA256}  /tmp/minitool-zip-builder-1.6.0.skill" | sha256sum --check -
+          rm -rf .codex
+          mkdir -p .codex
+          unzip -q /tmp/minitool-zip-builder-1.6.0.skill -d .codex
+          SKILL_DIR="$(find .codex -type f -name SKILL.md -path '*minitool-zip-builder*' -printf '%h\n' | head -n 1)"
+          test -n "$SKILL_DIR"
+          test -f "$SKILL_DIR/scripts/audit_artifact.py"
+          echo "SKILL_DIR=${SKILL_DIR}" >> "$GITHUB_ENV"
+          echo '--- SKILL.md ---'
+          cat "$SKILL_DIR/SKILL.md"
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
       - name: Run core tests
         run: npm run test:core
 
-      - name: Build
-        run: npm run build
+      - name: Build Xiaohongshu mini-tool artifact
+        run: npx tsc -b && npx vite build --mode xhs
 
-      - name: Create zip package
+      - name: Validate artifact semantics
+        run: node scripts/validate-xhs.cjs dist validation-summary.txt
+
+      - name: Run official directory audit
         shell: bash
         run: |
+          set -euo pipefail
+          python3 "$SKILL_DIR/scripts/audit_artifact.py" dist | tee official-directory-audit.txt
+
+      - name: Create upload zip
+        shell: bash
+        run: |
+          set -euo pipefail
           SHORT_SHA="${GITHUB_SHA::7}"
-          ZIP_NAME="bead-studio-${SHORT_SHA}.zip"
+          ZIP_NAME="bead-studio-xhs-${SHORT_SHA}.zip"
           cd dist
-          zip -r "../${ZIP_NAME}" .
+          zip -q -r "../${ZIP_NAME}" . -x '*.DS_Store'
           cd ..
           echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
           ls -lh "${ZIP_NAME}"
 
+      - name: Run official zip audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$SKILL_DIR/scripts/audit_artifact.py" "$ZIP_NAME" | tee official-zip-audit.txt
+          sha256sum "$ZIP_NAME" | tee "${ZIP_NAME}.sha256"
+
+      - name: Write release summary
+        shell: bash
+        run: |
+          {
+            echo "Source commit: ${GITHUB_SHA}"
+            echo "Skill: minitool-zip-builder 1.6.0"
+            echo "Skill SHA-256: 29c04115fd89d7eab7b81775f4287ae20c569ad3794d25d8404dc0ec3ec3b65e"
+            echo "Package: ${ZIP_NAME}"
+            echo
+            cat validation-summary.txt
+            echo
+            cat official-directory-audit.txt
+            cat official-zip-audit.txt
+          } > release-summary.txt
+          cat release-summary.txt
+
       - name: Upload zip artifact
         uses: actions/upload-artifact@v7
         with:
-          name: bead-studio-${{ github.sha }}
-          path: ${{ env.ZIP_NAME }}
+          name: bead-studio-xhs-${{ github.sha }}
+          path: |
+            ${{ env.ZIP_NAME }}
+            ${{ env.ZIP_NAME }}.sha256
+            validation-summary.txt
+            official-directory-audit.txt
+            official-zip-audit.txt
+            release-summary.txt
           if-no-files-found: error
           retention-days: 30

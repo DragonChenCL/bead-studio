@@ -1,0 +1,100 @@
+/* Chrome/WebView 61 baseline for the Xiaohongshu mini-tool build. */
+button:focus,
+.filebtn:focus,
+input:focus {
+  outline: 3px solid rgba(217, 130, 115, 0.22);
+  outline-offset: 2px;
+}
+
+.xhs-save-hint {
+  display: inline-block;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #7a6a5d;
+}
+
+.project-name {
+  width: 70vw;
+  max-width: 520px;
+}
+
+.studio-board {
+  width: 78%;
+  max-width: 420px;
+  height: 350px;
+}
+
+.studio-board-grid i {
+  height: 0;
+  padding-top: 100%;
+}
+
+.preview-canvas-wrap {
+  height: 72vh;
+  max-height: 820px;
+}
+
+.welcome-copy h2 {
+  font-size: 42px;
+}
+
+.studio-hero-copy h2 {
+  font-size: 50px;
+}
+
+.preview-canvas-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  min-height: 320px;
+  text-align: center;
+  line-height: 1.8;
+  color: #6f6258;
+  background: #eee5db;
+}
+
+.no-flex-gap .brand > * + *,
+.no-flex-gap .toolbar > * + *,
+.no-flex-gap .tabs > * + *,
+.no-flex-gap .preview-head-actions > * + *,
+.no-flex-gap .segmented-control > * + *,
+.no-flex-gap .project-strip > * + *,
+.no-flex-gap .preview-metrics > * + * {
+  margin-left: 10px;
+}
+
+.no-flex-gap .preview-view-list > * + *,
+.no-flex-gap .preview-scene-list > * + *,
+.no-flex-gap .tool-dock-body > * + * {
+  margin-top: 10px;
+}
+
+@media (max-width: 760px) {
+  html,
+  body,
+  #root,
+  .app-shell {
+    min-height: 100vh;
+  }
+
+  .workspace-viewport {
+    height: 52vh !important;
+  }
+
+  .h5-build-page .workspace-viewport {
+    height: 47vh !important;
+  }
+
+  .studio-preview-page .workspace-viewport {
+    height: 53vh !important;
+  }
+
+  .welcome-copy h2 {
+    font-size: 34px;
+  }
+
+  .studio-hero-copy h2 {
+    font-size: 42px;
+  }
+}
