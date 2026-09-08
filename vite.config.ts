@@ -30,7 +30,7 @@ function xhsMiniToolPlugin(): Plugin {
         );
         next = replaceOrFail(
           next,
-          'createRoot(document.getElementById(\'root\')!).render(',
+          "createRoot(document.getElementById('root')!).render(",
           `function supportsFlexGap() {\n  const flex = document.createElement('div');\n  flex.style.position = 'absolute';\n  flex.style.visibility = 'hidden';\n  flex.style.display = 'flex';\n  flex.style.flexDirection = 'column';\n  flex.style.rowGap = '1px';\n  flex.appendChild(document.createElement('div'));\n  flex.appendChild(document.createElement('div'));\n  document.body.appendChild(flex);\n  const supported = flex.scrollHeight === 1;\n  if (flex.parentNode) flex.parentNode.removeChild(flex);\n  return supported;\n}\n\nif (!supportsFlexGap()) document.documentElement.classList.add('no-flex-gap');\n\ncreateRoot(document.getElementById('root')!).render(`,
           'add flex gap behavior detection',
         );
@@ -40,7 +40,6 @@ function xhsMiniToolPlugin(): Plugin {
       if (cleanId.endsWith('/src/App.tsx')) {
         let next = code;
         next = replaceOrFail(next, "import { downloadJson } from './core/download';\n", '', 'remove download helper import');
-        next = replaceOrFail(next, "  const importRef = useRef<HTMLInputElement | null>(null);\n", '', 'remove json import ref');
         next = replaceOrFail(
           next,
           "    media.addEventListener?.('change', sync);\n    return () => media.removeEventListener?.('change', sync);",
@@ -49,9 +48,15 @@ function xhsMiniToolPlugin(): Plugin {
         );
         next = replaceOrFail(
           next,
-          /\n  function exportProject\(\) \{[\s\S]*?\n  \}\n\n  async function importProject\(ev: ChangeEvent<HTMLInputElement>\) \{[\s\S]*?\n  \}\n\n  function newProject\(\) \{/,
-          '\n  function newProject() {',
-          'remove unsupported json import/export flows',
+          /\n  function exportProject\(\) \{[\s\S]*?\n  \}\n\n  async function importProject/,
+          `\n  function exportProject() {\n    notify('小工具会自动保存作品，暂不支持导出工程文件');\n  }\n\n  async function importProject`,
+          'replace unsupported json export flow',
+        );
+        next = replaceOrFail(
+          next,
+          /  async function importProject\(ev: ChangeEvent<HTMLInputElement>\) \{[\s\S]*?\n  \}\n\n  function newProject/,
+          `  async function importProject(ev: ChangeEvent<HTMLInputElement>) {\n    notify('小工具暂不支持导入工程文件');\n    ev.target.value = '';\n  }\n\n  function newProject`,
+          'replace unsupported json import flow',
         );
         next = replaceOrFail(
           next,
@@ -59,9 +64,14 @@ function xhsMiniToolPlugin(): Plugin {
           '\n          <span className="xhs-save-hint">工程自动保存在本机</span>',
           'replace unsupported project file controls',
         );
+        next = replaceOrFail(
+          next,
+          'onImport={() => importRef.current?.click()}',
+          "onImport={() => notify('小工具暂不支持导入工程文件')}",
+          'replace mobile json import action',
+        );
         return next;
       }
-
 
       if (cleanId.endsWith('/src/components/InventoryPanel.tsx')) {
         let next = code;
@@ -101,8 +111,8 @@ function xhsMiniToolPlugin(): Plugin {
         );
         next = replaceOrFail(
           next,
-          "    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.55));",
-          "    let renderScale = 1.5;\n    renderer.setPixelRatio(1);",
+          '    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.55));',
+          '    let renderScale = 1.5;\n    renderer.setPixelRatio(1);',
           'cap WebGL dpr',
         );
         next = replaceOrFail(
@@ -181,7 +191,8 @@ function xhsMiniToolPlugin(): Plugin {
           .replace(/<meta name="application-name"[^>]*>/g, '')
           .replace(/<link rel="(?:icon|apple-touch-icon|manifest)"[^>]*>/g, '')
           .replace(/\s+type="module"/g, '')
-          .replace(/\s+crossorigin/g, '');
+          .replace(/\s+crossorigin/g, '')
+          .replace(/<script src=/g, '<script defer src=');
       },
     },
   };
